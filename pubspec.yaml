@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  font_awesome_flutter: ^10.12.0
+  font_awesome_flutter: ^11.0.0
   line_awesome_flutter: ^3.0.1
   community_material_icon: ^5.9.55
   supabase_flutter: ^2.12.0
