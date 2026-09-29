@@ -45,6 +45,7 @@ class _CategorylistState extends State<Categorylist> {
     return Scaffold(
         appBar: AppBar(
           title: Text(widget.category),
+          centerTitle: true,
         ),
         body: StreamBuilder<List<Map<String, dynamic>>>(
           stream: Supabase.instance.client.from("freezer")
@@ -70,7 +71,7 @@ class _CategorylistState extends State<Categorylist> {
               itemBuilder: (context, index) {
                 final item = items[index];
                 return ListTile(
-                  leading: Icon(CommunityMaterialIcons.circle_medium, color: theme.colorScheme.secondary),
+                  //leading: Icon(CommunityMaterialIcons.circle_medium, color: theme.colorScheme.secondary),
                   title: Text(item["item"] ?? "Unbekannt"),
                   subtitle: Wrap(
                     spacing: 2,
