@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:community_material_icon/community_material_icon.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:keller/testPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:keller/addPageFreezer.dart';
 import 'package:keller/freezerPage.dart';
 import 'package:keller/pantryPage.dart';
 import 'package:keller/addPage.dart';

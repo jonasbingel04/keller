@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:community_material_icon/community_material_icon.dart';
+import 'package:keller/bringService.dart';
 
 class PantryPage extends StatefulWidget {
   const PantryPage({super.key});
@@ -11,6 +12,7 @@ class PantryPage extends StatefulWidget {
 
 class _PantryPageState extends State<PantryPage> {
   late final Stream<List<Map<String, dynamic>>> _pantryStream;
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -28,7 +30,6 @@ class _PantryPageState extends State<PantryPage> {
       "in_stock": true,
     }).eq("id", id);
   }
-
 
   Future<void> _decrease(int id, int currentAmount) async {
     int newAmount = currentAmount - 1;
@@ -49,6 +50,48 @@ class _PantryPageState extends State<PantryPage> {
         .from("pantry")
         .delete()
         .eq("id", id);
+  }
+
+  /// Sendet alle nicht vorrätigen Artikel nacheinander an Bring!
+  Future<void> _sendAllOutOfStockToBring(List<Map<String, dynamic>> outOfStockItems) async {
+    if (outOfStockItems.isEmpty || _isSyncing) return;
+
+    setState(() {
+      _isSyncing = true;
+    });
+
+    int successCount = 0;
+
+    for (var entry in outOfStockItems) {
+      final String itemName = (entry['item'] ?? '').toString().trim();
+      if (itemName.isNotEmpty) {
+        final success = await HomeAssistantBringService.addToShoppingList(itemName);
+        if (success) successCount++;
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSyncing = false;
+    });
+
+    if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$successCount Artikel zur Bring!-Liste hinzugefügt!'),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fehler beim Hinzufügen der Artikel zu Bring!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Map<String, List<Map<String, dynamic>>> _groupItemsByAlphabet(
@@ -167,6 +210,38 @@ class _PantryPageState extends State<PantryPage> {
                   ),
                 ),
                 ...outOfStockItems.map((entry) => _buildItemTile(entry, true)),
+
+                const SizedBox(height: 24),
+
+                // Button für den Sammel-Import zu Bring!
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _isSyncing
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : const Icon(CommunityMaterialIcons.cart_plus),
+                    label: Text(
+                      _isSyncing
+                          ? 'Wird an Bring! gesendet...'
+                          : 'Fehlende Artikel zu Bring! hinzufügen',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    onPressed: _isSyncing
+                        ? null
+                        : () => _sendAllOutOfStockToBring(outOfStockItems),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ],
           );
