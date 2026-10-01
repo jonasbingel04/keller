@@ -14,7 +14,6 @@ class _PantryPageState extends State<PantryPage> {
   late final Stream<List<Map<String, dynamic>>> _pantryStream;
   bool _isSyncing = false;
 
-  // Controller & Query für die Suchfunktion
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -68,7 +67,6 @@ class _PantryPageState extends State<PantryPage> {
         .eq("id", id);
   }
 
-  // Dialog für das Bearbeiten (Swipe von Links nach Rechts)
   Future<void> _showEditDialog(Map<String, dynamic> entry) async {
     final int id = entry['id'] as int;
     final String currentName = (entry['item'] ?? '').toString();
@@ -200,7 +198,6 @@ class _PantryPageState extends State<PantryPage> {
       ),
       body: Column(
         children: [
-          // Suchleiste
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
@@ -243,7 +240,6 @@ class _PantryPageState extends State<PantryPage> {
 
                 final allItems = snapshot.data ?? [];
 
-                // Filterung nach Suchbegriff
                 final filteredItems = allItems.where((entry) {
                   final String itemName = (entry['item'] ?? '').toString().toLowerCase();
                   return itemName.contains(_searchQuery);
@@ -356,21 +352,17 @@ class _PantryPageState extends State<PantryPage> {
     );
   }
 
-  // Wrappt die Item-Tile in ein Dismissible für Swipe-Gesten (Bearbeiten & Löschen)
   Widget _buildDismissibleItemTile(Map<String, dynamic> entry, bool isOutOfStock) {
     final int id = entry['id'] as int;
 
     return Dismissible(
       key: Key('pantry_item_$id'),
-      // Erlaubt sowohl Swipe nach links (Delete) als auch nach rechts (Edit)
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          // Links -> Rechts: Bearbeiten
           await _showEditDialog(entry);
-          return false; // Eintrag in der Liste behalten
+          return false;
         } else if (direction == DismissDirection.endToStart) {
-          // Rechts -> Links: Löschen
-          return true; // Löschen bestätigen
+          return true;
         }
         return false;
       },

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:community_material_icon/community_material_icon.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddPageFreezer extends StatefulWidget{
