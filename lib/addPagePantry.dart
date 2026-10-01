@@ -33,10 +33,27 @@ class _AddPagePantryState extends State<AddPagePantry> {
       _brand = null;
     });
 
-    final url = Uri.parse(
-        'https://world.openfoodfacts.org/api/v2/product/$barcode.json');
-
     try {
+      final client = Supabase.instance.client;
+
+      final dbResponse = await client
+          .from('pantry')
+          .select('item, brand')
+          .eq('barcode', barcode)
+          .maybeSingle();
+
+      if (dbResponse != null && dbResponse['item'] != null) {
+        setState(() {
+          _productName = dbResponse['item'] as String;
+          _brand = (dbResponse['brand'] ?? '') as String;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse(
+          'https://world.openfoodfacts.org/api/v2/product/$barcode.json');
+
       final response = await http.get(
         url,
         headers: {
@@ -87,60 +104,60 @@ class _AddPagePantryState extends State<AddPagePantry> {
             .select()
             .eq('barcode', barcode);
         existingItems = List<Map<String, dynamic>>.from(response);
-    }
+      }
 
-    if (existingItems.isNotEmpty) {
-    final existingProduct = existingItems.first;
-    final int currentAmount = (existingProduct['amount'] ?? 0) as int;
-    final int newAmount = currentAmount + amountToAdd;
-    final int id = existingProduct['id'] as int;
+      if (existingItems.isNotEmpty) {
+        final existingProduct = existingItems.first;
+        final int currentAmount = (existingProduct['amount'] ?? 0) as int;
+        final int newAmount = currentAmount + amountToAdd;
+        final int id = existingProduct['id'] as int;
 
-    await client.from('pantry').update({
-    'amount': newAmount,
-    'in_stock': true,
-    'item': item,
-    'brand': brand.isEmpty ? null : brand,
-    }).eq('id', id);
+        await client.from('pantry').update({
+          'amount': newAmount,
+          'in_stock': true,
+          'item': item,
+          'brand': brand.isEmpty ? null : brand,
+        }).eq('id', id);
 
-    if (!mounted) return;
+        if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-    content: Text(
-    'Menge von "$item" auf $newAmount erhöht (+$amountToAdd)!'),
-    backgroundColor: Colors.blue.shade700,
-    duration: const Duration(seconds: 2),
-    ),
-    );
-    } else {
-    await client.from('pantry').insert({
-    'item': item,
-    'brand': brand.isEmpty ? null : brand,
-    'amount': amountToAdd,
-    'in_stock': true,
-    'barcode': barcode,
-    });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Menge von "$item" auf $newAmount erhöht (+$amountToAdd)!'),
+            backgroundColor: Colors.blue.shade700,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        await client.from('pantry').insert({
+          'item': item,
+          'brand': brand.isEmpty ? null : brand,
+          'amount': amountToAdd,
+          'in_stock': true,
+          'barcode': barcode,
+        });
 
-    if (!mounted) return;
+        if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-    content: Text(
-    '$item ($amountToAdd Stk.) neu zum Vorratskeller hinzugefügt!'),
-    backgroundColor: Colors.green.shade700,
-    duration: const Duration(seconds: 2),
-    ),
-    );
-    }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '$item ($amountToAdd Stk.) neu zum Vorratskeller hinzugefügt!'),
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-    debugPrint('Fehler beim Speichern in Supabase: $e');
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-    content: Text('Fehler beim Speichern: $e'),
-    backgroundColor: Colors.red,
-    ),
-    );
+      debugPrint('Fehler beim Speichern in Supabase: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Fehler beim Speichern: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -292,7 +309,6 @@ class _AddPagePantryState extends State<AddPagePantry> {
               }
             },
           ),
-
           Center(
             child: Container(
               width: 250,
@@ -306,7 +322,6 @@ class _AddPagePantryState extends State<AddPagePantry> {
               ),
             ),
           ),
-
           Positioned(
             bottom: 40,
             left: 24,
