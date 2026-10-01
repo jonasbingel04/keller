@@ -71,7 +71,6 @@ class _CategorylistState extends State<Categorylist> {
               itemBuilder: (context, index) {
                 final item = items[index];
                 return ListTile(
-                  //leading: Icon(CommunityMaterialIcons.circle_medium, color: theme.colorScheme.secondary),
                   title: Text(item["item"] ?? "Unbekannt"),
                   subtitle: Wrap(
                     spacing: 2,

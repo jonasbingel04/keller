@@ -148,7 +148,6 @@ class _PantryPageState extends State<PantryPage> {
                 );
               }),
 
-              // --- SECTION 2: AUSVERKAUFTE ITEMS (Ausgegrauter Cache unten) ---
               if (outOfStockItems.isNotEmpty) ...[
                 const SizedBox(height: 32),
                 const Divider(thickness: 1),
@@ -243,7 +242,6 @@ class _PantryPageState extends State<PantryPage> {
       ),
     );
 
-    // Swipe-to-Delete
     if (isOutOfStock) {
       return Dismissible(
         key: Key('pantry_item_$id'),

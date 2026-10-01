@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:community_material_icon/community_material_icon.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:keller/testPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:keller/addPage.dart';
+import 'package:keller/addPageFreezer.dart';
 import 'package:keller/freezerPage.dart';
 import 'package:keller/pantryPage.dart';
+import 'package:keller/addPage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -102,13 +104,13 @@ class _MainNavScreenState extends State<MainNavScreen> {
             label: 'Hinzufügen',
           ),
           NavigationDestination(
-            icon: Icon(Icons.ac_unit_outlined),
-            selectedIcon: Icon(Icons.ac_unit),
+            icon: Icon(CommunityMaterialIcons.snowflake),
+            selectedIcon: Icon(CommunityMaterialIcons.snowflake),
             label: 'Gefrierschrank',
           ),
           NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
+            icon: Icon(Icons.food_bank_outlined),
+            selectedIcon: Icon(Icons.food_bank),
             label: 'Vorratskeller',
           ),
         ],

@@ -1,95 +1,84 @@
 import 'package:flutter/material.dart';
 import 'package:community_material_icon/community_material_icon.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:keller/addPageFreezer.dart';
+import 'package:keller/addPagePantry.dart';
 
-class AddPage extends StatefulWidget{
+class AddPage extends StatelessWidget {
   const AddPage({super.key});
-
-  @override
-  State<AddPage> createState() => _AddPageState();
-}
-
-class _AddPageState extends State<AddPage> {
-  final _nameController = TextEditingController();
-  final _amountController = TextEditingController();
-  final _portionController = TextEditingController();
-
-  final List<String> _categories = ["Fleisch", "Fisch", "Gemüse", "Obst", "Backwaren", "Eis", "Fertiggerichte", "Sonstiges"];
-  String _selectedCategory = "Fleisch";
-
-  final _selectedDate = DateTime.now();
-
-  @override
-  void initState(){
-    super.initState();
-    _selectedCategory = _categories.first;
-  }
-
-  Future<void> _saveItem() async {
-    final name = _nameController.text;
-    final amount = int.tryParse(_amountController.text) ?? 0;
-    final portion = _portionController.text;
-
-    if (name.isEmpty || amount <= 0 || portion.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Bitte alle Felder ausfüllen!"))
-      );
-      return;
-    }
-
-    try {
-      await Supabase.instance.client.from("freezer").insert({
-        "item": name,
-        "amount": amount,
-        "portion_size": portion,
-        "category": _selectedCategory,
-        "date": _selectedDate.toIso8601String().split("T")[0],
-      });
-
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      print("Fehler beim Speichern $e");
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Neu"),),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: "Name"),),
-            TextField(controller: _amountController, decoration: const InputDecoration(labelText: "Anzahl"), keyboardType: TextInputType.number,),
-            TextField(controller: _portionController, decoration: const InputDecoration(labelText: "Portionsgröße"),),
-            const SizedBox(height: 15,),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCategory,
-              decoration: const InputDecoration(
-                labelText: "Kategorie",
-                border: OutlineInputBorder(),
-              ),
-              items: _categories.map((String category) {
-                return DropdownMenuItem<String>(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedCategory = newValue!;
-                });
-              },
+      appBar: AppBar(
+        title: const Text('Hinzufügen'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                //Gefrierschrank
+                _buildSquareButton(
+                  context: context,
+                  icon: CommunityMaterialIcons.snowflake,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddPageFreezer(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                //Vorratskeller
+                _buildSquareButton(
+                  context: context,
+                  icon: Icons.food_bank,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddPagePantry(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
 
-
-
-            const SizedBox(height: 20,),
-            ElevatedButton(
-                onPressed: _saveItem,
-                child: Text("Speichern")),
-          ],
+  Widget _buildSquareButton({
+    required BuildContext context,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 160,
+      height: 150,
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Center(
+            child: Icon(
+              icon,
+              size: 48,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );

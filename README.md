@@ -63,7 +63,7 @@ flutter run
 ##  Projektstruktur
 
 - `lib/main.dart`: Hauptmenü (Grid-Ansicht) und App-Konfiguration.
-- `lib/addPage.dart`: Logik zum Hinzufügen neuer Artikel.
+- `lib/addPageFreezer.dart`: Logik zum Hinzufügen neuer Artikel.
 - `lib/categoryList.dart`: Dynamische Liste der Artikel mit Update/Delete-Funktionen.
 
 ##  Sicherheitshinweis
