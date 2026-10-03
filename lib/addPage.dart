@@ -76,7 +76,6 @@ class AddPage extends StatelessWidget {
             child: Icon(
               icon,
               size: 48,
-              color: Colors.white,
             ),
           ),
         ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:community_material_icon/community_material_icon.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:keller/bringService.dart';
 
 class PantryPage extends StatefulWidget {
@@ -16,6 +18,18 @@ class _PantryPageState extends State<PantryPage> {
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener =
+  ItemPositionsListener.create();
+
+  bool _isDraggingIndex = false;
+  double _bubbleY = 0.0;
+  String _draggedLetter = '#';
+  final GlobalKey _alphabetKey = GlobalKey();
+
+  String _activeLetter = '#';
+  final List<String> _alphabet = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   @override
   void initState() {
@@ -36,6 +50,60 @@ class _PantryPageState extends State<PantryPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _scrollToIndex(int index) {
+    if (_itemScrollController.isAttached) {
+      _itemScrollController.scrollTo(
+        index: index,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _onIndexInteractionUpdate(
+      Offset localPosition,
+      Map<String, int> letterIndexes,
+      int? outOfStockIndex,
+      ) {
+    final RenderBox? renderBox =
+    _alphabetKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final double height = renderBox.size.height;
+    final int itemCount = _alphabet.length + 1;
+    final double itemHeight = height / itemCount;
+
+    int index = (localPosition.dy / itemHeight).floor();
+    index = index.clamp(0, itemCount - 1);
+
+    final double clampedY = localPosition.dy.clamp(20.0, height - 20.0);
+
+    String newLetter;
+    if (index < _alphabet.length) {
+      newLetter = _alphabet[index];
+    } else {
+      newLetter = 'CACHE';
+    }
+
+    if (newLetter != _draggedLetter || _bubbleY != clampedY) {
+      if (newLetter != _draggedLetter) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() {
+        _draggedLetter = newLetter;
+        _bubbleY = clampedY;
+      });
+
+      if (newLetter == 'CACHE') {
+        if (outOfStockIndex != null) {
+          _scrollToIndex(outOfStockIndex);
+        }
+      } else if (letterIndexes.containsKey(newLetter)) {
+        _scrollToIndex(letterIndexes[newLetter]!);
+      }
+    }
   }
 
   Future<void> _modify(int id, int currentAmount, bool isStock) async {
@@ -61,19 +129,18 @@ class _PantryPageState extends State<PantryPage> {
   }
 
   Future<void> _deleteItem(int id) async {
-    await Supabase.instance.client
-        .from("pantry")
-        .delete()
-        .eq("id", id);
+    await Supabase.instance.client.from("pantry").delete().eq("id", id);
   }
 
   Future<void> _showEditDialog(Map<String, dynamic> entry) async {
-    final int id = entry['id'] as int;
+    final int id = int.tryParse(entry['id']?.toString() ?? '0') ?? 0;
     final String currentName = (entry['item'] ?? '').toString();
-    final int currentAmount = (entry['amount'] ?? 0) as int;
+    final int currentAmount =
+        int.tryParse(entry['amount']?.toString() ?? '0') ?? 0;
 
     final nameController = TextEditingController(text: currentName);
-    final amountController = TextEditingController(text: currentAmount.toString());
+    final amountController =
+    TextEditingController(text: currentAmount.toString());
 
     return showDialog(
       context: context,
@@ -103,7 +170,8 @@ class _PantryPageState extends State<PantryPage> {
             ElevatedButton(
               onPressed: () async {
                 final newName = nameController.text.trim();
-                final newAmount = int.tryParse(amountController.text) ?? currentAmount;
+                final newAmount =
+                    int.tryParse(amountController.text) ?? currentAmount;
 
                 if (newName.isNotEmpty) {
                   await Supabase.instance.client.from("pantry").update({
@@ -122,7 +190,8 @@ class _PantryPageState extends State<PantryPage> {
     );
   }
 
-  Future<void> _sendAllOutOfStockToBring(List<Map<String, dynamic>> outOfStockItems) async {
+  Future<void> _sendAllOutOfStockToBring(
+      List<Map<String, dynamic>> outOfStockItems) async {
     if (outOfStockItems.isEmpty || _isSyncing) return;
 
     setState(() {
@@ -134,7 +203,8 @@ class _PantryPageState extends State<PantryPage> {
     for (var entry in outOfStockItems) {
       final String itemName = (entry['item'] ?? '').toString().trim();
       if (itemName.isNotEmpty) {
-        final success = await HomeAssistantBringService.addToShoppingList(itemName);
+        final success =
+        await HomeAssistantBringService.addToShoppingList(itemName);
         if (success) successCount++;
       }
     }
@@ -171,7 +241,10 @@ class _PantryPageState extends State<PantryPage> {
       final String itemName = (entry['item'] ?? '').toString().trim();
       if (itemName.isEmpty) continue;
 
-      final String firstLetter = itemName[0].toUpperCase();
+      String firstLetter = itemName[0].toUpperCase();
+      if (!RegExp(r'[A-Z]').hasMatch(firstLetter)) {
+        firstLetter = '#';
+      }
 
       if (!grouped.containsKey(firstLetter)) {
         grouped[firstLetter] = [];
@@ -208,12 +281,11 @@ class _PantryPageState extends State<PantryPage> {
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                   icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                  },
+                  onPressed: () => _searchController.clear(),
                 )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                contentPadding:
+                const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -230,6 +302,7 @@ class _PantryPageState extends State<PantryPage> {
                 }
 
                 if (snapshot.hasError) {
+                  debugPrint('Pantry Stream Error: ${snapshot.error}');
                   return Center(
                     child: Text(
                       'Fehler beim Laden: ${snapshot.error}',
@@ -241,7 +314,8 @@ class _PantryPageState extends State<PantryPage> {
                 final allItems = snapshot.data ?? [];
 
                 final filteredItems = allItems.where((entry) {
-                  final String itemName = (entry['item'] ?? '').toString().toLowerCase();
+                  final String itemName =
+                  (entry['item'] ?? '').toString().toLowerCase();
                   return itemName.contains(_searchQuery);
                 }).toList();
 
@@ -262,87 +336,293 @@ class _PantryPageState extends State<PantryPage> {
                 filteredItems.where((i) => i['in_stock'] == false).toList();
 
                 final groupedInStock = _groupItemsByAlphabet(inStockItems);
-                final sortedAlphabetKeys = groupedInStock.keys.toList()..sort();
 
-                return ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  children: [
-                    ...sortedAlphabetKeys.map((letter) {
-                      final letterItems = groupedInStock[letter]!;
+                final sortedAlphabetKeys = groupedInStock.keys.toList()
+                  ..sort((a, b) {
+                    if (a == '#') return -1;
+                    if (b == '#') return 1;
+                    return a.compareTo(b);
+                  });
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16, bottom: 4, left: 8),
-                            child: Text(
-                              letter,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withOpacity(0.5),
+                final List<Widget> listWidgets = [];
+                final Map<String, int> letterIndexes = {};
+                final Map<int, String> indexToLetter = {};
+                int? outOfStockIndex;
+
+                for (var letter in sortedAlphabetKeys) {
+                  final int headerIndex = listWidgets.length;
+                  letterIndexes[letter] = headerIndex;
+                  indexToLetter[headerIndex] = letter;
+
+                  listWidgets.add(
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          top: 16, bottom: 4, left: 16, right: 36),
+                      child: Text(
+                        letter,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  );
+
+                  final letterItems = groupedInStock[letter]!;
+                  for (var entry in letterItems) {
+                    final int itemIndex = listWidgets.length;
+                    indexToLetter[itemIndex] = letter;
+                    listWidgets.add(
+                      Padding(
+                        padding: const EdgeInsets.only(right: 28),
+                        child: _buildDismissibleItemTile(entry, false),
+                      ),
+                    );
+                  }
+                }
+
+                if (outOfStockItems.isNotEmpty) {
+                  listWidgets.add(const SizedBox(height: 32));
+                  listWidgets.add(const Divider(thickness: 1));
+
+                  outOfStockIndex = listWidgets.length;
+                  indexToLetter[outOfStockIndex] = 'CACHE';
+
+                  listWidgets.add(
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 16),
+                      child: Text(
+                        'Nicht auf Lager',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.4),
+                        ),
+                      ),
+                    ),
+                  );
+
+                  for (var entry in outOfStockItems) {
+                    final int itemIndex = listWidgets.length;
+                    indexToLetter[itemIndex] = 'CACHE';
+                    listWidgets.add(
+                      Padding(
+                        padding: const EdgeInsets.only(right: 28),
+                        child: _buildDismissibleItemTile(entry, true),
+                      ),
+                    );
+                  }
+
+                  listWidgets.add(
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: _isSyncing
+                            ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child:
+                          CircularProgressIndicator(strokeWidth: 2),
+                        )
+                            : const Icon(CommunityMaterialIcons.cart_plus),
+                        label: Text(
+                          _isSyncing
+                              ? 'Wird an Bring! gesendet...'
+                              : 'Fehlende Artikel zu Bring! hinzufügen',
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                        onPressed: _isSyncing
+                            ? null
+                            : () => _sendAllOutOfStockToBring(outOfStockItems),
+                      ),
+                    ),
+                  );
+                }
+
+                return ValueListenableBuilder<Iterable<ItemPosition>>(
+                  valueListenable: _itemPositionsListener.itemPositions,
+                  builder: (context, positions, child) {
+                    if (positions.isNotEmpty && !_isDraggingIndex) {
+                      final firstVisible = positions.reduce((a, b) =>
+                      a.itemLeadingEdge < b.itemLeadingEdge ? a : b);
+                      final currentLetter = indexToLetter[firstVisible.index];
+                      if (currentLetter != null &&
+                          currentLetter != _activeLetter) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _activeLetter = currentLetter;
+                            });
+                          }
+                        });
+                      }
+                    }
+
+                    final String activeDisplay =
+                    _isDraggingIndex ? _draggedLetter : _activeLetter;
+
+                    return Stack(
+                      children: [
+                        ScrollablePositionedList.builder(
+                          itemScrollController: _itemScrollController,
+                          itemPositionsListener: _itemPositionsListener,
+                          itemCount: listWidgets.length,
+                          itemBuilder: (context, index) => listWidgets[index],
+                        ),
+
+                        if (_isDraggingIndex)
+                          Positioned(
+                            right: 48,
+                            top: _bubbleY - 26,
+                            child: Material(
+                              elevation: 6,
+                              shape: const CircleBorder(),
+                              color: Theme.of(context).colorScheme.primary,
+                              child: Container(
+                                width: 52,
+                                height: 52,
+                                alignment: Alignment.center,
+                                child: activeDisplay == 'CACHE'
+                                    ? const Icon(
+                                  Icons.receipt,
+                                  size: 26,
+                                  color: Colors.white,
+                                )
+                                    : Text(
+                                  activeDisplay,
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                          ...letterItems.map((entry) => _buildDismissibleItemTile(entry, false)),
-                        ],
-                      );
-                    }),
 
-                    if (outOfStockItems.isNotEmpty) ...[
-                      const SizedBox(height: 32),
-                      const Divider(thickness: 1),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                        child: Text(
-                          'Nicht auf Lager',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.4),
-                          ),
-                        ),
-                      ),
-                      ...outOfStockItems.map((entry) => _buildDismissibleItemTile(entry, true)),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onVerticalDragStart: (details) {
+                              setState(() {
+                                _isDraggingIndex = true;
+                              });
+                              _onIndexInteractionUpdate(
+                                details.localPosition,
+                                letterIndexes,
+                                outOfStockIndex,
+                              );
+                            },
+                            onVerticalDragUpdate: (details) {
+                              _onIndexInteractionUpdate(
+                                details.localPosition,
+                                letterIndexes,
+                                outOfStockIndex,
+                              );
+                            },
+                            onVerticalDragEnd: (_) {
+                              setState(() {
+                                _isDraggingIndex = false;
+                              });
+                            },
+                            onVerticalDragCancel: () {
+                              setState(() {
+                                _isDraggingIndex = false;
+                              });
+                            },
+                            child: Container(
+                              key: _alphabetKey,
+                              padding: const EdgeInsets.only(
+                                  right: 6, left: 24, top: 8, bottom: 8),
+                              color: Colors.transparent,
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ..._alphabet.map((letter) {
+                                        final bool hasItems =
+                                        letterIndexes.containsKey(letter);
+                                        final bool isActive =
+                                            activeDisplay == letter;
 
-                      const SizedBox(height: 24),
-
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 1, horizontal: 4),
+                                          child: Text(
+                                            letter,
+                                            style: TextStyle(
+                                              fontSize: isActive ? 13 : 11,
+                                              fontWeight: isActive
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                              color: hasItems
+                                                  ? (isActive
+                                                  ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface)
+                                                  : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.2),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 2, horizontal: 4),
+                                        child: Icon(
+                                          Icons.receipt,
+                                          size: activeDisplay == 'CACHE'
+                                              ? 16
+                                              : 14,
+                                          color: outOfStockIndex != null
+                                              ? (activeDisplay == 'CACHE'
+                                              ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)
+                                              : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.2),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                          icon: _isSyncing
-                              ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                              : const Icon(CommunityMaterialIcons.cart_plus),
-                          label: Text(
-                            _isSyncing
-                                ? 'Wird an Bring! gesendet...'
-                                : 'Fehlende Artikel zu Bring! hinzufügen',
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                          onPressed: _isSyncing
-                              ? null
-                              : () => _sendAllOutOfStockToBring(outOfStockItems),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ],
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -352,8 +632,9 @@ class _PantryPageState extends State<PantryPage> {
     );
   }
 
-  Widget _buildDismissibleItemTile(Map<String, dynamic> entry, bool isOutOfStock) {
-    final int id = entry['id'] as int;
+  Widget _buildDismissibleItemTile(
+      Map<String, dynamic> entry, bool isOutOfStock) {
+    final int id = int.tryParse(entry['id']?.toString() ?? '0') ?? 0;
 
     return Dismissible(
       key: Key('pantry_item_$id'),
@@ -370,21 +651,13 @@ class _PantryPageState extends State<PantryPage> {
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 16),
         color: Colors.green.shade600,
-        child: const Icon(
-          Icons.edit,
-          color: Colors.white,
-          size: 24,
-        ),
+        child: const Icon(Icons.edit, color: Colors.white, size: 24),
       ),
       secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         color: Colors.red.shade400,
-        child: const Icon(
-          Icons.delete_outline,
-          color: Colors.white,
-          size: 24,
-        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
       ),
       onDismissed: (direction) {
         if (direction == DismissDirection.endToStart) {
@@ -404,9 +677,9 @@ class _PantryPageState extends State<PantryPage> {
 
   Widget _buildItemTile(Map<String, dynamic> entry, bool isOutOfStock) {
     final String itemName = (entry['item'] ?? 'Unbenannt').toString();
-    final int amount = (entry['amount'] ?? 0) as int;
-    final int id = entry['id'] as int;
-    final bool isStock = entry['in_stock'] ?? true;
+    final int amount = int.tryParse(entry['amount']?.toString() ?? '0') ?? 0;
+    final int id = int.tryParse(entry['id']?.toString() ?? '0') ?? 0;
+    final bool isStock = entry['in_stock'] == true;
 
     final double textOpacity = isOutOfStock ? 0.35 : 1.0;
 
